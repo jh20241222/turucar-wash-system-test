@@ -36,9 +36,9 @@
 
     {# ── 비밀번호 변경 ── #}
     <section class="turu-menu-card-v24">
-        <div class="turu-menu-row-v24 no-arrow" onclick="toggleSection('pw-change-form')" style="cursor:pointer;">
-            <span>🔑</span><div><strong>비밀번호 변경</strong><small>현재 비밀번호 확인 후 변경</small></div><b id="pw-arrow">›</b>
-        </div>
+        <button type="button" class="turu-menu-row-v24 button-row" onclick="toggleSection('pw-change-form')">
+            <span>🔑</span><div><strong>비밀번호 변경</strong><small>현재 비밀번호 확인 후 변경</small></div><b>›</b>
+        </button>
         <div id="pw-change-form" style="display:none; padding: 0 16px 16px;">
             <form method="POST" action="{{ url_for('change_password') }}">
                 <div style="margin-bottom:10px;">
@@ -61,9 +61,9 @@
     {# ── 비밀번호 초기화 (admin/master) ── #}
     {% if current_user.is_admin and reset_targets %}
     <section class="turu-menu-card-v24">
-        <div class="turu-menu-row-v24 no-arrow" onclick="toggleSection('pw-reset-form')" style="cursor:pointer;">
-            <span>🔓</span><div><strong>비밀번호 초기화</strong><small>소속 계정을 0325로 초기화</small></div><b id="reset-arrow">›</b>
-        </div>
+        <button type="button" class="turu-menu-row-v24 button-row" onclick="toggleSection('pw-reset-form')">
+            <span>🔓</span><div><strong>비밀번호 초기화</strong><small>소속 계정을 0325로 초기화</small></div><b>›</b>
+        </button>
         <div id="pw-reset-form" style="display:none; padding: 0 16px 16px;">
             <form method="POST" action="{{ url_for('reset_password') }}" onsubmit="return confirm('선택한 계정의 비밀번호를 0325로 초기화할까요?');">
                 <div style="margin-bottom:14px;">
