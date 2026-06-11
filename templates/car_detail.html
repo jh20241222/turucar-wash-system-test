@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block document_title %}Turu Wash · {{ car['차량번호'] }}{% endblock %}
+{% block content %}
+<section class="detail-page-brand-v36"><img src="{{ url_for('static', filename='img/turucar_logo_brand.png') }}" alt="TURU CAR"></section>
+
+<section class="detail-hero app-card elevated brand-line-card detail-hero-clean">
+    <div class="hero-copy-block">
+        <img src="{{ url_for('static', filename='img/turucar_logo_brand.png') }}" alt="TuruCar" class="page-hero-logo brand-combo-logo">
+        <h1>업무 수행 시작</h1>
+        <p class="hero-copy">차량 정보를 확인하고 세차 기록을 입력하세요.</p>
+    </div>
+    <div class="plate-display">{{ car['차량번호'] }}</div>
+</section>
+
+<section class="detail-grid detail-grid-clean">
+    <article class="vehicle-card app-card vehicle-card-clean">
+        <div class="vehicle-topline">
+            <span class="status-pill waiting">세차 대기</span>
+            <span>{{ car['업체'] or '-' }}</span>
+        </div>
+        <h2>{{ car['차량번호'] }}</h2>
+        <p>{{ car['차종명'] or '-' }} · {{ car['차량소속'] or '-' }}</p>
+
+        {% if is_long_wash %}
+        <div style="background:#FAECE7;border-radius:8px;padding:8px 12px;margin:10px 0;display:flex;align-items:center;gap:7px;font-size:13px;color:#993C1D;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D85A30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <strong>장기 미세차</strong> — {{ elapsed }}일째 미완료, 우선 처리 필요
+        </div>
+        {% else %}
+        <div style="background:#EAF3DE;border-radius:8px;padding:8px 12px;margin:10px 0;display:flex;align-items:center;gap:7px;font-size:13px;color:#3B6D11;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#639922" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <strong>정기세차</strong>{% if elapsed > 0 %} — D+{{ elapsed }}{% else %} — 오늘 등록{% endif %}
+        </div>
+        {% endif %}
+
+        <div class="info-list">
+            <div><small>스팟</small><strong>{{ car['스팟'] or '-' }}</strong></div>
+            <div><small>주소</small><strong>{{ car['주소'] or '-' }}</strong></div>
+            <div><small>지역</small><strong>{{ car['지역시도'] or '-' }} {{ car['지역구군'] or '' }}</strong></div>
+            <div><small>등록일</small><strong>{{ car['등록일'] or car['세차일'] or '-' }}</strong></div>
+            <div><small>세차일</small><strong>{{ car['세차일'] or '-' }}</strong></div>
+            {% if car['이월횟수'] and car['이월횟수'] > 0 %}
+            <div><small>이월 횟수</small><strong>{{ car['이월횟수'] }}회</strong></div>
+            {% endif %}
+        </div>
+    </article>
+
+    <form id="wash-form" class="work-form app-card work-form-clean" action="{{ url_for('wash_complete', id=car['id']) }}" method="POST">
+        <div class="step-title clean-step-title"><span>01</span><strong>세차 기록 입력</strong></div>
+        <label class="field-label" for="distance">주행거리</label>
+        <input id="distance" class="app-input" name="distance" inputmode="numeric" placeholder="예: 12530km">
+        <label class="field-label" for="damage">차량 훼손 부위</label>
+        <textarea id="damage" class="app-input" name="damage" placeholder="없으면 비워두거나 '없음' 입력"></textarea>
+        <label class="field-label" for="warning">경고등</label>
+        <textarea id="warning" class="app-input" name="warning" placeholder="경고등 내용 입력"></textarea>
+        <label class="field-label" for="etc">기타 특이사항</label>
+        <textarea id="etc" class="app-input" name="etc" placeholder="추가로 공유할 내용 입력"></textarea>
+        <div class="sticky-actions clean-action-area">
+            <div class="action-grid">
+                <button type="button" class="secondary-btn" onclick="copyInfo()">복사</button>
+                <button type="button" class="blue-btn" onclick="openBand()">밴드</button>
+                <button type="submit" class="primary-btn">완료 처리</button>
+            </div>
+        </div>
+    </form>
+</section>
+
+<script>
+const carInfo={number:{{ car['차량번호'] | tojson }},model:{{ car['차종명'] | tojson }},org:{{ car['차량소속'] | tojson }},spot:{{ car['스팟'] | tojson }},address:{{ car['주소'] | tojson }},region1:{{ car['지역시도'] | tojson }},region2:{{ car['지역구군'] | tojson }}};
+async function copyToClipboard(text){if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(text);return;}const textarea=document.createElement("textarea");textarea.value=text;textarea.style.position="fixed";textarea.style.left="-9999px";document.body.appendChild(textarea);textarea.focus();textarea.select();document.execCommand("copy");document.body.removeChild(textarea);}
+async function copyInfo(){const distance=document.getElementById("distance").value||"없음";const damage=document.getElementById("damage").value||"없음";const warning=document.getElementById("warning").value||"없음";const etc=document.getElementById("etc").value||"없음";const text=[`[세차 완료 공유]`,`차량번호: ${carInfo.number||"-"}`,`차종명: ${carInfo.model||"-"}`,`차량소속: ${carInfo.org||"-"}`,`스팟: ${carInfo.spot||"-"}`,`주소: ${carInfo.address||"-"}`,`지역: ${(carInfo.region1||"-")} ${(carInfo.region2||"")}`,`주행거리: ${distance}`,`훼손: ${damage}`,`경고등: ${warning}`,`특이사항: ${etc}`].join("\n");await copyToClipboard(text).catch(()=>null);alert("복사되었습니다.");}
+async function openBand(){try{const response=await fetch("{{ url_for('band_link', id=car['id']) }}");const data=await response.json();if(!response.ok||!data.ok||!data.band_link){alert(data.message||"등록된 밴드 링크가 없습니다.");return;}window.open(data.band_link,"_blank","noopener");}catch(error){alert("밴드 링크를 불러오는 중 오류가 발생했습니다.");}}
+</script>
+{% endblock %}

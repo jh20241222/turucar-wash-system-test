@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block document_title %}Turu Wash · 세차 대상 업로드{% endblock %}
+{% block content %}
+<section class="page-hero app-card elevated brand-line-card">
+    <div class="hero-copy-block"><img src="{{ url_for('static', filename='img/turucar_logo_brand.png') }}" alt="TuruCar" class="page-hero-logo brand-combo-logo"><h1>세차 대상 업로드</h1><p class="hero-copy">세차일자와 엑셀 파일을 선택하면 오더 카드가 자동으로 생성됩니다.</p></div>
+    <div class="hero-chip-stack"><span>XLSX</span><strong>마스터 전용</strong></div>
+</section>
+
+<section class="admin-layout single">
+    <article class="admin-card app-card">
+        <div class="admin-card-head"><div><p class="eyebrow">01 Register</p><h2>업로드 정보</h2></div><span class="badge">.xlsx</span></div>
+        <form method="POST" enctype="multipart/form-data" class="stack-form">
+            <label class="field-label" for="wash_date">세차일자</label>
+            <input id="wash_date" type="date" name="wash_date" class="app-input" required>
+            <label class="field-label" for="file">엑셀 파일</label>
+            <label class="file-drop" for="file"><span class="file-drop-icon">↑</span><strong>파일을 여기에 선택하세요</strong><small id="file-name">필수 컬럼이 들어있는 .xlsx 파일만 업로드</small><input id="file" type="file" name="file" accept=".xlsx" required></label>
+            <button type="submit" class="primary-btn tall full">업로드 시작</button>
+        </form>
+    </article>
+    <aside class="guide-card app-card">
+        <p class="eyebrow">02 Checklist</p><h3>필수 컬럼</h3>
+        <ul class="check-list"><li>차량번호</li><li>차종명</li><li>차량소속</li><li>현재스팟명 / 현재스팟주소</li><li>지역(시/도) / 지역(구/군)</li><li>담당업체</li></ul>
+    </aside>
+</section>
+<script>document.getElementById('file')?.addEventListener('change',e=>{const f=e.target.files?.[0];if(f)document.getElementById('file-name').textContent=f.name;});</script>
+{% endblock %}
