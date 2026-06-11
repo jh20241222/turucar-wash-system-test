@@ -1308,7 +1308,50 @@ def upload_wash_list():
         flash("✔ 업로드 완료")
         return redirect(url_for("upload_wash_list"))
 
-    return render_template("upload_wash_list.html")
+    # 날짜 목록 조회 (삭제 UI용)
+    conn = get_wash_db()
+    date_list = conn.execute(
+        "SELECT 세차일, COUNT(*) AS cnt FROM wash_list GROUP BY 세차일 ORDER BY 세차일 DESC"
+    ).fetchall()
+    total_count = conn.execute("SELECT COUNT(*) AS c FROM wash_list").fetchone()["c"]
+    conn.close()
+
+    return render_template("upload_wash_list.html", date_list=date_list, total_count=total_count)
+
+
+# =========================================================
+# 세차 스케줄 삭제 (날짜별 or 전체)
+# =========================================================
+@app.route("/wash_schedule_delete", methods=["POST"])
+@login_required
+def wash_schedule_delete():
+    if not current_user.is_master:
+        flash("❌ 마스터 계정만 삭제할 수 있습니다.")
+        return redirect(url_for("upload_wash_list"))
+
+    delete_type = request.form.get("delete_type")
+    conn = get_wash_db()
+
+    if delete_type == "all":
+        conn.execute("DELETE FROM wash_list")
+        conn.commit()
+        conn.close()
+        flash("✔ 전체 세차 오더가 삭제되었습니다.")
+    elif delete_type == "date":
+        target_date = request.form.get("target_date", "").strip()
+        if not target_date:
+            flash("❌ 삭제할 날짜를 선택하세요.")
+            conn.close()
+            return redirect(url_for("upload_wash_list"))
+        conn.execute("DELETE FROM wash_list WHERE 세차일 = ?", (target_date,))
+        conn.commit()
+        conn.close()
+        flash(f"✔ {target_date} 오더가 삭제되었습니다.")
+    else:
+        conn.close()
+        flash("❌ 올바른 삭제 방식을 선택하세요.")
+
+    return redirect(url_for("upload_wash_list"))
 
 
 # =========================================================
