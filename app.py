@@ -2822,93 +2822,131 @@ def support_reply(ticket_id):
 
 
 # =========================================================
-# 피플카 예약 현황 조회
+# 피플카 예약 현황 — 백그라운드 캐시
 # =========================================================
 import re as _re
+import threading as _threading
 
-@app.route("/peoplecar_reservation/<car_no>")
-@login_required
-def peoplecar_reservation(car_no):
-    """피플카 전산에서 차량번호로 예약 현황 조회 후 타임라인 데이터 반환"""
+_pc_cache = {}          # {차량번호: [예약블록, ...]}
+_pc_cache_time = None   # 마지막 갱신 시각
+_pc_cache_lock = _threading.Lock()
+_pc_fetching = False    # 현재 갱신 중 여부
+
+def _fetch_all_peoplecar():
+    """피플카 전체 스팟 조회 → _pc_cache 갱신 (백그라운드 스레드)"""
+    global _pc_cache, _pc_cache_time, _pc_fetching
     try:
         session_key = os.environ.get("PEOPLECAR_SESSION_KEY", "")
         user_id     = os.environ.get("PEOPLECAR_USER_ID", "wjddus874")
         corp_id     = os.environ.get("PEOPLECAR_CORP_ID", "1")
-
         if not session_key:
-            return jsonify({"error": "SessionKey 없음. 환경변수 PEOPLECAR_SESSION_KEY 설정 필요"}), 500
+            return
 
         base_url = "https://pm.peoplecar.co.kr:8082"
+        now_str  = now_kst().strftime("%Y%m%d%H%M")
+        end_str  = now_kst().strftime("%Y%m%d") + "2359"
+        params   = {"SessionKey": session_key, "UserId": user_id, "CorpId": corp_id}
 
-        # 1단계: res_car.asp — 현재 위치 기반 스팟+차량 목록 (차량번호로 필터링)
-        now_str = now_kst().strftime("%Y%m%d%H%M")
-        end_str = now_kst().strftime("%Y%m%d") + "2330"
-
-        res_car_resp = _requests.post(
+        # 1) 전체 스팟 목록 가져오기
+        html = _requests.post(
             f"{base_url}/reservation/res_car.asp",
-            params={"SessionKey": session_key, "UserId": user_id, "CorpId": corp_id},
-            data={
-                "appOS": "",
-                "latitude": "36.3356",
-                "longitude": "127.3847",
-                "st_date": now_str,
-                "end_date": end_str,
-            },
-            verify=False,
-            timeout=10
-        )
+            params=params,
+            data={"appOS": "", "latitude": "36.3356", "longitude": "127.3847",
+                  "st_date": now_str, "end_date": end_str},
+            verify=False, timeout=15
+        ).text
 
-        html = res_car_resp.text
+        spot_ids = list(dict.fromkeys(_re.findall(r'fun_marker_click\("(\d+)"', html)))
 
-        # 스팟 ID 목록 추출 (fun_marker_click 에서)
-        spot_ids = _re.findall(r'fun_marker_click\("(\d+)"', html)
-        spot_ids = list(dict.fromkeys(spot_ids))  # 중복제거
+        new_cache = {}
 
-        # 2단계: 각 스팟의 spot_info.asp 조회해서 차량번호 매칭
-        for spot_id in spot_ids[:30]:  # 너무 많으면 느리니 30개 제한
-            spot_resp = _requests.post(
-                f"{base_url}/reservation/spot_info.asp",
-                params={"SessionKey": session_key, "UserId": user_id, "CorpId": corp_id},
-                data={
-                    "SpotId": spot_id,
-                    "st_date": now_str,
-                    "end_date": end_str,
-                    "fdLicStatus": "True",
-                    "fdIsConfirm": "True",
-                },
-                verify=False,
-                timeout=10
-            )
-            spot_html = spot_resp.text
+        # 2) 스팟별 병렬 조회
+        def fetch_spot(spot_id):
+            try:
+                spot_html = _requests.post(
+                    f"{base_url}/reservation/spot_info.asp",
+                    params=params,
+                    data={"SpotId": spot_id, "st_date": now_str, "end_date": end_str,
+                          "fdLicStatus": "True", "fdIsConfirm": "True"},
+                    verify=False, timeout=10
+                ).text
 
-            # 차량번호가 이 스팟에 있는지 확인
-            # 차량번호에서 숫자+한글 변환: "146하7820" 형태
-            car_no_clean = car_no.replace(" ", "")
-            if car_no_clean not in spot_html:
-                continue
+                # 각 차량 타임라인 파싱
+                # 차량번호 패턴: (왕복)106호5845 또는 차량번호 직접
+                car_blocks = _re.findall(
+                    r'<li class="car-name">\s*\([^)]+\)([\d\w가-힣]+)',
+                    spot_html
+                )
+                timeline_divs = _re.findall(
+                    r'<!-- timeline -->(.*?)<!-- //timeline -->',
+                    spot_html, _re.DOTALL
+                )
 
-            # my-time div에서 예약 블록 추출
-            timeline_blocks = _re.findall(
-                r'<div class="my-time"[^>]*style="([^"]*)"[^>]*title="([^"]*)"',
-                spot_html
-            )
+                for i, tl in enumerate(timeline_divs):
+                    blocks = _re.findall(
+                        r'<div class="my-time"[^>]*style="([^"]*)"[^>]*title="([^"]*)"',
+                        tl
+                    )
+                    reservations = []
+                    for style, title in blocks:
+                        lm = _re.search(r'left:([\d.]+)%', style)
+                        wm = _re.search(r'width:([\d.]+)%', style)
+                        reservations.append({
+                            "left":  float(lm.group(1)) if lm else 0,
+                            "width": float(wm.group(1)) if wm else 0,
+                            "title": title,
+                        })
+                    if i < len(car_blocks):
+                        car_no = car_blocks[i].strip()
+                        new_cache[car_no] = reservations
+            except Exception:
+                pass
 
-            reservations = []
-            for style, title in timeline_blocks:
-                left_m  = _re.search(r'left:([\d.]+)%', style)
-                width_m = _re.search(r'width:([\d.]+)%', style)
-                reservations.append({
-                    "left":  float(left_m.group(1))  if left_m  else 0,
-                    "width": float(width_m.group(1)) if width_m else 0,
-                    "title": title,
-                })
+        threads = [_threading.Thread(target=fetch_spot, args=(sid,)) for sid in spot_ids]
+        for t in threads: t.start()
+        for t in threads: t.join(timeout=12)
 
-            return jsonify({"car_no": car_no, "reservations": reservations, "spot_id": spot_id})
-
-        return jsonify({"car_no": car_no, "reservations": [], "message": "예약 없음"})
+        with _pc_cache_lock:
+            _pc_cache = new_cache
+            _pc_cache_time = now_kst()
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        app.logger.warning(f"[피플카 캐시] 갱신 실패: {e}")
+    finally:
+        _pc_fetching = False
+
+
+def _ensure_pc_cache():
+    """캐시가 5분 이상 됐으면 백그라운드 갱신 트리거"""
+    global _pc_fetching
+    from datetime import timedelta
+    if _pc_fetching:
+        return
+    if _pc_cache_time is None or (now_kst() - _pc_cache_time) > timedelta(minutes=5):
+        _pc_fetching = True
+        t = _threading.Thread(target=_fetch_all_peoplecar, daemon=True)
+        t.start()
+
+
+@app.route("/peoplecar_reservation/<car_no>")
+@login_required
+def peoplecar_reservation(car_no):
+    _ensure_pc_cache()
+    car_no_clean = car_no.replace(" ", "")
+    with _pc_cache_lock:
+        reservations = _pc_cache.get(car_no_clean, [])
+        cached = _pc_cache_time.strftime("%H:%M") if _pc_cache_time else None
+    return jsonify({"car_no": car_no, "reservations": reservations, "cached_at": cached})
+
+
+@app.route("/peoplecar_refresh")
+@login_required
+def peoplecar_refresh():
+    """강제 캐시 갱신"""
+    global _pc_fetching, _pc_cache_time
+    _pc_cache_time = None
+    _ensure_pc_cache()
+    return jsonify({"ok": True, "message": "백그라운드 갱신 시작"})
 
 
 if __name__ == "__main__":
