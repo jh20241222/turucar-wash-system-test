@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -15,8 +15,23 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/desktop.css') }}?v=20">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <script>
+    // FOUC 방지
+    (function(){
+        if(window.innerWidth >= 901){
+            var s = document.createElement('style');
+            s.id = '_fouc_guard';
+            s.textContent = 'body{opacity:0!important;transition:none!important}';
+            document.head.appendChild(s);
+        }
+    })();
+    </script>
 </head>
 <body class="app-shell endpoint-{{ request.endpoint or 'page' }}">
+
+    <!-- ══ 모바일 상단바 ══ -->
     <header class="app-topbar">
         <div class="topbar-left topbar-left--minimal">
             {% if request.endpoint != 'dashboard' %}
@@ -35,50 +50,71 @@
         </div>
     </header>
 
+    <!-- ══ 데스크탑 사이드바 ══ -->
     <aside class="desktop-sidebar">
-        <a href="{{ url_for('dashboard') }}" class="sidebar-brand daangn-sidebar-brand" aria-label="Turu Wash 홈">
-            <img src="{{ url_for('static', filename='img/turucar_logo_brand.png') }}" alt="TuruCar" class="sidebar-logo turu-wordmark brand-combo-logo">
-            <strong class="sidebar-subtitle">Wash Manager</strong>
-            <small>현장 세차 앱</small>
+        <a href="{{ url_for('dashboard') }}" class="sidebar-brand" aria-label="Turu Wash 홈">
+            <img src="{{ url_for('static', filename='img/turu_wash_lockup_white.png') }}" alt="Turu CAR" class="sb-logo-dark">
+            <img src="{{ url_for('static', filename='img/turucar_logo_brand.png') }}" alt="Turu CAR" class="sb-logo-light">
         </a>
 
         <nav class="side-nav">
+            <!-- 세차 관리 -->
+            <p class="side-nav-group">세차 관리</p>
             <a href="{{ url_for('dashboard') }}" class="side-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
-                <span>⌂</span><b>홈</b>
+                <i class="ti ti-home" aria-hidden="true"></i><b>홈</b>
             </a>
             <a href="{{ url_for('wash_list') }}" class="side-link {% if request.endpoint in ['wash_list','car_detail'] %}active{% endif %}">
-                <span>▣</span><b>세차 오더</b>
+                <i class="ti ti-car" aria-hidden="true"></i><b>세차 오더</b>
             </a>
-            <a href="https://pm.peoplecar.co.kr:8082/#" class="side-link admin-app-link">
-                <span>↗</span><b>예약/제어</b>
+            <a href="https://pm.peoplecar.co.kr:8082/#" class="side-link admin-app-link" target="_blank">
+                <i class="ti ti-calendar" aria-hidden="true"></i><b>예약/제어</b>
             </a>
             <a href="{{ url_for('wash_status') }}" class="side-link {% if request.endpoint == 'wash_status' %}active{% endif %}">
-                <span>✓</span><b>완료 현황</b>
+                <i class="ti ti-check" aria-hidden="true"></i><b>완료 현황</b>
             </a>
-            <a href="{{ url_for('profile') }}" class="side-link {% if request.endpoint == 'profile' %}active{% endif %}">
-                <span>◉</span><b>내정보</b>
+            {% if current_user.is_master %}
+            <!-- 데이터 관리 -->
+            <p class="side-nav-group" style="margin-top:4px;">데이터 관리</p>
+            <a href="{{ url_for('upload_wash_list') }}" class="side-link {% if request.endpoint == 'upload_wash_list' %}active{% endif %}">
+                <i class="ti ti-upload" aria-hidden="true"></i><b>오더 업로드</b>
             </a>
-
-            {% if current_user.is_admin %}
+            <!-- 계정 관리 -->
+            <p class="side-nav-group" style="margin-top:4px;">계정 관리</p>
             <a href="{{ url_for('account_manage') }}" class="side-link {% if request.endpoint == 'account_manage' %}active{% endif %}">
-                <span>●</span><b>계정/지역</b>
+                <i class="ti ti-users" aria-hidden="true"></i><b>계정/지역</b>
             </a>
-            {% endif %}
-            {% if current_user.is_master or current_user.username == 'jeongyeon.kim' %}
+            <a href="{{ url_for('vendor_manage') }}" class="side-link {% if request.endpoint == 'vendor_manage' %}active{% endif %}">
+                <i class="ti ti-building" aria-hidden="true"></i><b>업체 관리</b>
+            </a>
             <a href="{{ url_for('support_manage') }}" class="side-link side-link-with-badge {% if request.endpoint == 'support_manage' %}active{% endif %}">
-                <span>☏</span><b>문의 관리</b>
+                <i class="ti ti-message" aria-hidden="true"></i><b>문의 관리</b>
                 <em class="side-menu-bubble support-menu-badge{% if not support_badge_count %} is-hidden{% endif %}" data-support-badge>
                     {{ support_badge_count if support_badge_count and support_badge_count < 100 else ('99+' if support_badge_count else '') }}
                 </em>
             </a>
             {% endif %}
 
-            {% if current_user.is_master %}
-            <a href="{{ url_for('vendor_manage') }}" class="side-link {% if request.endpoint == 'vendor_manage' %}active{% endif %}">
-                <span>□</span><b>업체 관리</b>
+            {% if current_user.is_admin and not current_user.is_master %}
+            <p class="side-nav-group" style="margin-top:4px;">관리</p>
+            <a href="{{ url_for('account_manage') }}" class="side-link {% if request.endpoint == 'account_manage' %}active{% endif %}">
+                <i class="ti ti-users" aria-hidden="true"></i><b>계정/지역</b>
             </a>
-            <a href="{{ url_for('upload_wash_list') }}" class="side-link {% if request.endpoint == 'upload_wash_list' %}active{% endif %}">
-                <span>↑</span><b>세차 스케줄 관리</b>
+            <a href="{{ url_for('support_manage') }}" class="side-link side-link-with-badge {% if request.endpoint == 'support_manage' %}active{% endif %}">
+                <i class="ti ti-message" aria-hidden="true"></i><b>문의 관리</b>
+                <em class="side-menu-bubble support-menu-badge{% if not support_badge_count %} is-hidden{% endif %}" data-support-badge>
+                    {{ support_badge_count if support_badge_count and support_badge_count < 100 else ('99+' if support_badge_count else '') }}
+                </em>
+            </a>
+            {% endif %}
+
+            {% if not current_user.is_master %}
+            <!-- 내정보 -->
+            <p class="side-nav-group" style="margin-top:4px;">내정보</p>
+            <a href="{{ url_for('profile') }}" class="side-link {% if request.endpoint == 'profile' %}active{% endif %}">
+                <i class="ti ti-user" aria-hidden="true"></i><b>계정 정보</b>
+            </a>
+            <a href="{{ url_for('my_vehicles') }}" class="side-link {% if request.endpoint == 'my_vehicles' %}active{% endif %}">
+                <i class="ti ti-car" aria-hidden="true"></i><b>내 담당 차량</b>
             </a>
             {% endif %}
         </nav>
@@ -93,7 +129,48 @@
         </div>
     </aside>
 
+    <!-- ══ 메인 ══ -->
     <main class="app-main">
+
+        <!-- 데스크탑 상단바 -->
+        <div class="dt-topnav">
+            <div class="dt-topnav-left">
+                <p class="dt-topnav-crumb">
+                    {% if request.endpoint in ['wash_list','car_detail'] %}세차 관리
+                    {% elif request.endpoint == 'wash_status' %}세차 관리
+                    {% elif request.endpoint == 'upload_wash_list' %}세차 관리 / 데이터 관리
+                    {% elif request.endpoint == 'order_generate' %}데이터 관리
+                    {% elif request.endpoint in ['account_manage'] %}계정 관리
+                    {% elif request.endpoint == 'vendor_manage' %}계정 관리
+                    {% elif request.endpoint == 'support_manage' %}계정 관리
+                    {% elif request.endpoint == 'profile' %}내정보
+                    {% elif request.endpoint == 'my_vehicles' %}내정보
+                    {% else %}홈{% endif %}
+                </p>
+                <h1 class="dt-topnav-title">
+                    {% if request.endpoint in ['wash_list','car_detail'] %}세차 오더
+                    {% elif request.endpoint == 'wash_status' %}완료 현황
+                    {% elif request.endpoint == 'upload_wash_list' %}세차 스케줄 관리
+                    {% elif request.endpoint == 'order_generate' %}오더 자동생성
+                    {% elif request.endpoint == 'account_manage' %}계정/지역
+                    {% elif request.endpoint == 'vendor_manage' %}업체 관리
+                    {% elif request.endpoint == 'support_manage' %}문의 관리
+                    {% elif request.endpoint == 'profile' %}계정 정보
+                    {% elif request.endpoint == 'my_vehicles' %}내 담당 차량
+                    {% elif request.endpoint == 'dashboard' %}홈
+                    {% else %}{% block page_title %}{% endblock %}{% endif %}
+                </h1>
+            </div>
+            <div class="dt-topnav-right">
+                <button class="dt-theme-btn" onclick="toggleTheme()" aria-label="테마 전환">
+                    <i class="ti ti-sun" id="dt-theme-icon" aria-hidden="true"></i>
+                    <span id="dt-theme-label">라이트</span>
+                </button>
+                <span class="dt-topnav-user">{{ current_user.username }}</span>
+                <a href="{{ url_for('logout') }}" class="dt-logout-btn">로그아웃</a>
+            </div>
+        </div>
+
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 <div class="flash-stack">
@@ -103,9 +180,11 @@
                 </div>
             {% endif %}
         {% endwith %}
+
         {% block content %}{% endblock %}
     </main>
 
+    <!-- ══ 모바일 하단 탭바 ══ -->
     <nav class="mobile-tabbar turu-mobile-tabbar" aria-label="주요 메뉴">
         <a href="{{ url_for('dashboard') }}" class="tab-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
             <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3.5 11.2 12 4.3l8.5 6.9"/><path d="M6.5 10.3v9.4h11v-9.4"/><path d="M10 19.7v-5h4v5"/></svg></span><b>홈</b>
@@ -119,14 +198,12 @@
         <a href="{{ url_for('wash_status') }}" class="tab-item {% if request.endpoint == 'wash_status' %}active{% endif %}">
             <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5.5" y="4.5" width="13" height="16" rx="2"/><path d="M9 9h6M9 13h4M9.5 17l2 2 4-5"/></svg></span><b>완료</b>
         </a>
-        <a href="{{ url_for('profile') }}" class="tab-item {% if request.endpoint in ['profile','account_manage','vendor_manage','upload_wash_list'] %}active{% endif %}">
+        <a href="{{ url_for('profile') }}" class="tab-item {% if request.endpoint in ['profile','account_manage','vendor_manage','upload_wash_list','my_vehicles'] %}active{% endif %}">
             <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c1.5-5 13.5-5 15 0"/></svg></span><b>내정보</b>
         </a>
     </nav>
 
-    <a href="{{ url_for('dashboard') }}" class="floating-turu-home-link" aria-label="Turu Wash 홈으로 이동">
-        Turu Wash
-    </a>
+    <a href="{{ url_for('dashboard') }}" class="floating-turu-home-link" aria-label="Turu Wash 홈으로 이동">Turu Wash</a>
 
     {% if current_user.is_authenticated and (current_user.is_master or current_user.username == 'jeongyeon.kim') %}
     <script>
@@ -138,12 +215,54 @@
     </script>
     <script src="{{ url_for('static', filename='js/support_alerts.js') }}?v=23"></script>
     {% endif %}
+
     <div class="turu-app-loader-overlay" id="turuAppLoader" aria-hidden="true">
         <div class="turu-app-loader-card" role="status" aria-live="polite">
             <span class="turu-app-loader-spinner" aria-hidden="true"></span>
         </div>
     </div>
+
     <script src="{{ url_for('static', filename='js/pwa.js') }}?v=31"></script>
     <script src="{{ url_for('static', filename='js/app_loader.js') }}?v=31"></script>
+    <script>
+    (function(){
+        function setMode(){
+            if(window.innerWidth >= 901){
+                document.body.id = 'desktop-mode';
+            } else {
+                document.body.id = '';
+            }
+            var s = document.getElementById('_fouc_guard');
+            if(s) s.remove();
+            document.body.style.opacity = '';
+        }
+        setMode();
+        window.addEventListener('resize', setMode);
+    })();
+    </script>
+
+
+    <script>
+    (function() {
+        const saved = localStorage.getItem('turu-theme') || 'light';
+        document.documentElement.setAttribute('data-theme', saved);
+        const icon = document.getElementById('dt-theme-icon');
+        const label = document.getElementById('dt-theme-label');
+        if (icon) icon.className = saved === 'dark' ? 'ti ti-moon' : 'ti ti-sun';
+        if (label) label.textContent = saved === 'dark' ? '다크' : '라이트';
+    })();
+
+    function toggleTheme() {
+        const html = document.documentElement;
+        const current = html.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('turu-theme', next);
+        const icon = document.getElementById('dt-theme-icon');
+        const label = document.getElementById('dt-theme-label');
+        if (icon) icon.className = next === 'dark' ? 'ti ti-moon' : 'ti ti-sun';
+        if (label) label.textContent = next === 'dark' ? '다크' : '라이트';
+    }
+    </script>
 </body>
 </html>

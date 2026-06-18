@@ -25,6 +25,25 @@
 
 <section class="admin-layout single" style="margin-top: 0;">
     <article class="admin-card app-card">
+        <div class="admin-card-head"><div><p class="eyebrow">02 Band</p><h2>밴드매칭 업데이트</h2></div><span class="badge">.xlsx</span></div>
+        <form method="POST" action="{{ url_for('upload_band_matching') }}" enctype="multipart/form-data" class="stack-form">
+            <label class="field-label" for="band_file">차량소속별_밴드매칭.xlsx</label>
+            <label class="file-drop" for="band_file"><span class="file-drop-icon">↑</span><strong>파일을 여기에 선택하세요</strong><small id="band-file-name">차량소속 / 담당업체 / 밴드링크 컬럼 포함 파일</small><input id="band_file" type="file" name="file" accept=".xlsx" required></label>
+            <button type="submit" class="primary-btn tall full" style="background:#333;" onclick="return confirm('밴드매칭 파일을 교체할까요? 기존 파일은 덮어씌워집니다.')">매칭 파일 업데이트</button>
+        </form>
+    </article>
+    <aside class="guide-card app-card">
+        <p class="eyebrow">Band Checklist</p><h3>필수 컬럼</h3>
+        <ul class="check-list">
+            <li>차량소속</li>
+            <li>밴드링크</li>
+            <li>담당업체 (선택 — 동일 차량소속에 업체별 링크가 다를 때)</li>
+        </ul>
+    </aside>
+</section>
+
+<section class="admin-layout single" style="margin-top: 0;">
+    <article class="admin-card app-card">
         <div class="admin-card-head"><div><p class="eyebrow">03 Delete</p><h2>스케줄 삭제</h2></div><span class="badge" style="background:#FAECE7;color:#993C1D;">총 {{ total_count }}대</span></div>
 
         <div class="stack-form">
@@ -51,13 +70,19 @@
                 <label class="field-label">전체 삭제</label>
                 <button type="submit" class="danger-delete-btn full" style="width:100%; padding: 12px;">전체 오더 삭제 ({{ total_count }}대)</button>
             </form>
+
+            {# 중복 제거 #}
+            <form method="POST" action="{{ url_for('wash_deduplicate') }}" onsubmit="return confirm('중복 오더를 제거할까요? 같은 날짜+차량번호 중 가장 먼저 등록된 것만 남깁니다.');" style="margin-top:12px;">
+                <label class="field-label">중복 오더 제거</label>
+                <button type="submit" class="danger-delete-btn full" style="width:100%; padding: 12px; background:#e67e22;">중복 오더 제거</button>
+            </form>
         </div>
     </article>
 
     {# 현재 스케줄 현황 #}
     {% if date_list %}
     <aside class="guide-card app-card">
-        <p class="eyebrow">04 Schedule</p><h3>현재 등록 현황</h3>
+        <p class="eyebrow">05 Schedule</p><h3>현재 등록 현황</h3>
         <ul class="check-list">
             {% for d in date_list %}
             <li>{{ d['세차일'] }} — {{ d['cnt'] }}대</li>
@@ -67,5 +92,137 @@
     {% endif %}
 </section>
 
-<script>document.getElementById('file')?.addEventListener('change',e=>{const f=e.target.files?.[0];if(f)document.getElementById('file-name').textContent=f.name;});</script>
+<script>
+document.getElementById('file')?.addEventListener('change',e=>{const f=e.target.files?.[0];if(f)document.getElementById('file-name').textContent=f.name;});
+document.getElementById('band_file')?.addEventListener('change',e=>{const f=e.target.files?.[0];if(f)document.getElementById('band-file-name').textContent=f.name;});
+</script>
+{# ── 데스크탑 전용 ── #}
+<div id="d-upload" style="display:none">
+<div class="d-wrap">
+<div class="d-grid-3">
+
+    <div class="d-card">
+        <div class="d-card-head"><div><span class="d-eyebrow">01 Upload</span><h2>오더 업로드</h2></div><span class="d-badge-pill">.xlsx</span></div>
+        <div class="d-card-body">
+            <form method="POST" action="{{ url_for('upload_wash_list') }}" enctype="multipart/form-data">
+                <div class="d-fg"><label class="d-label">세차일자</label><input type="date" name="wash_date" class="d-input" required></div>
+                <div class="d-fg">
+                    <label class="d-label" for="d-file">엑셀 파일</label>
+                    <label class="d-file-zone" for="d-file">
+                        <span class="d-file-zone-icon">↑</span>
+                        <strong>파일 선택</strong>
+                        <small id="d-file-name">필수 컬럼이 있는 .xlsx</small>
+                        <input id="d-file" type="file" name="file" accept=".xlsx" required>
+                    </label>
+                </div>
+                <button type="submit" class="d-btn d-btn-orange">업로드 시작</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="d-card">
+        <div class="d-card-head"><div><span class="d-eyebrow">02 Band</span><h2>밴드매칭 업데이트</h2></div><span class="d-badge-pill">.xlsx</span></div>
+        <div class="d-card-body">
+            <form method="POST" action="{{ url_for('upload_band_matching') }}" enctype="multipart/form-data">
+                <div class="d-fg">
+                    <label class="d-label" for="d-band-file">밴드매칭 파일</label>
+                    <label class="d-file-zone" for="d-band-file">
+                        <span class="d-file-zone-icon">↑</span>
+                        <strong>파일 선택</strong>
+                        <small id="d-band-file-name">차량소속 / 담당업체 / 밴드링크</small>
+                        <input id="d-band-file" type="file" name="file" accept=".xlsx" required>
+                    </label>
+                </div>
+                <button type="submit" class="d-btn d-btn-gray" onclick="return confirm('밴드매칭 파일을 교체할까요?')">업데이트</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="d-card">
+        <div class="d-card-head"><div><span class="d-eyebrow">03 Delete</span><h2>스케줄 삭제</h2></div><span class="d-badge-pill" style="background:#FAECE7;color:#993C1D;">총 {{ total_count }}대</span></div>
+        <div class="d-card-body">
+            <form method="POST" action="{{ url_for('wash_schedule_delete') }}" onsubmit="return confirm('선택한 날짜의 오더를 삭제할까요?');" style="margin-bottom:16px;">
+                <input type="hidden" name="delete_type" value="date">
+                <div class="d-fg"><label class="d-label">날짜별 삭제</label>
+                    <div class="d-inline-row">
+                        <select name="target_date" class="d-input" required>
+                            <option value="">날짜 선택</option>
+                            {% for d in date_list %}<option value="{{ d['세차일'] }}">{{ d['세차일'] }} ({{ d['cnt'] }}대)</option>{% endfor %}
+                        </select>
+                        <button type="submit" class="d-btn-danger-sm">삭제</button>
+                    </div>
+                </div>
+            </form>
+            <hr class="d-divider">
+            <form method="POST" action="{{ url_for('wash_schedule_delete') }}" onsubmit="return confirm('전체 세차 오더를 삭제할까요? 되돌릴 수 없습니다.');">
+                <input type="hidden" name="delete_type" value="all">
+                <div class="d-fg"><label class="d-label">전체 삭제</label>
+                    <button type="submit" class="d-btn-danger-sm" style="width:100%;padding:8px;">전체 오더 삭제 ({{ total_count }}대)</button>
+                </div>
+            </form>
+            <hr class="d-divider">
+            <form method="POST" action="{{ url_for('wash_deduplicate') }}" onsubmit="return confirm('중복 오더를 제거할까요? 같은 날짜+차량번호 중 가장 먼저 등록된 것만 남깁니다.');">
+                <div class="d-fg"><label class="d-label">중복 오더 제거</label>
+                    <button type="submit" class="d-btn-danger-sm" style="width:100%;padding:8px;background:#e67e22;border-color:#e67e22;">중복 오더 제거</button>
+                </div>
+            </form>
+            {% if date_list %}
+            <hr class="d-divider">
+            {% for d in date_list %}<div class="d-sched-item"><span>{{ d['세차일'] }}</span><span style="color:var(--d-muted)">{{ d['cnt'] }}대</span></div>{% endfor %}
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<div class="d-grid-2">
+    <div class="d-card">
+        <div class="d-card-head"><div><span class="d-eyebrow">04 Vehicle</span><h2>차량 마스터 업로드</h2></div><span class="d-badge-pill">.xlsx</span></div>
+        <div class="d-card-body">
+            <form method="POST" action="{{ url_for('upload_vehicle_master') }}" enctype="multipart/form-data">
+                <div class="d-fg">
+                    <label class="d-label" for="d-vehicle-file">차량 마스터 파일</label>
+                    <label class="d-file-zone" for="d-vehicle-file">
+                        <span class="d-file-zone-icon">↑</span>
+                        <strong>파일 선택</strong>
+                        <small id="d-vehicle-file-name">차량번호 / 차종명 / 차량소속 / 현재스팟명 / 현재스팟주소 / 지역(시/도) / 지역(구/군) / 담당업체</small>
+                        <input id="d-vehicle-file" type="file" name="vehicle_file" accept=".xlsx" required>
+                    </label>
+                </div>
+                <button type="submit" class="d-btn d-btn-blue" onclick="return confirm('차량 마스터를 업데이트할까요?')">차량 마스터 업데이트</button>
+            </form>
+        </div>
+    </div>
+    <div class="d-card">
+        <div class="d-card-head"><div><span class="d-eyebrow">Guide</span><h2>필수 컬럼</h2></div></div>
+        <div class="d-card-body">
+            <ul class="d-checklist">
+                <li>차량번호</li>
+                <li>차종명</li>
+                <li>차량소속</li>
+                <li>현재스팟명</li>
+                <li>현재스팟주소</li>
+                <li>지역(시/도)</li>
+                <li>지역(구/군)</li>
+                <li>담당업체</li>
+                <li>최근세차일 (선택)</li>
+                <li>세차경과일 (선택)</li>
+            </ul>
+        </div>
+    </div>
+</div>
+</div>
+</div>
+<script>
+document.getElementById('d-file')?.addEventListener('change',e=>{const f=e.target.files?.[0];if(f)document.getElementById('d-file-name').textContent=f.name;});
+document.getElementById('d-band-file')?.addEventListener('change',e=>{const f=e.target.files?.[0];if(f)document.getElementById('d-band-file-name').textContent=f.name;});
+document.getElementById('d-vehicle-file')?.addEventListener('change',e=>{const f=e.target.files?.[0];if(f)document.getElementById('d-vehicle-file-name').textContent=f.name;});
+</script>
+<style>
+#desktop-mode #d-upload { display: block !important; }
+#desktop-mode .page-hero,
+#desktop-mode .admin-layout,
+#desktop-mode .admin-layout.single { display: none !important; }
+</style>
+
 {% endblock %}
