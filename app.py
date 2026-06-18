@@ -2091,6 +2091,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 _CLIENT_ID_MAP = {
     "PEOPLECAR-CAR123-PROD": _os_env.environ.get("CLIENT_ID_CAR123", "44d0cc23b8ea5a36f11aeaa69d6baeda"),
+    "PEOPLECAR-PROD": _os_env.environ.get("CLIENT_ID_GENERAL", "dbd8e7fc563e462781c24b39d4378568"),
 }
 
 def _otoplug_session(car_org):
