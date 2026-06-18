@@ -2821,6 +2821,96 @@ def support_reply(ticket_id):
 
 
 
+# =========================================================
+# 피플카 예약 현황 조회
+# =========================================================
+import re as _re
+
+@app.route("/peoplecar_reservation/<car_no>")
+@login_required
+def peoplecar_reservation(car_no):
+    """피플카 전산에서 차량번호로 예약 현황 조회 후 타임라인 데이터 반환"""
+    try:
+        session_key = os.environ.get("PEOPLECAR_SESSION_KEY", "")
+        user_id     = os.environ.get("PEOPLECAR_USER_ID", "wjddus874")
+        corp_id     = os.environ.get("PEOPLECAR_CORP_ID", "1")
+
+        if not session_key:
+            return jsonify({"error": "SessionKey 없음. 환경변수 PEOPLECAR_SESSION_KEY 설정 필요"}), 500
+
+        base_url = "https://pm.peoplecar.co.kr:8082"
+
+        # 1단계: res_car.asp — 현재 위치 기반 스팟+차량 목록 (차량번호로 필터링)
+        now_str = now_kst().strftime("%Y%m%d%H%M")
+        end_str = now_kst().strftime("%Y%m%d") + "2330"
+
+        res_car_resp = _requests.post(
+            f"{base_url}/reservation/res_car.asp",
+            params={"SessionKey": session_key, "UserId": user_id, "CorpId": corp_id},
+            data={
+                "appOS": "",
+                "latitude": "36.3356",
+                "longitude": "127.3847",
+                "st_date": now_str,
+                "end_date": end_str,
+            },
+            verify=False,
+            timeout=10
+        )
+
+        html = res_car_resp.text
+
+        # 스팟 ID 목록 추출 (fun_marker_click 에서)
+        spot_ids = _re.findall(r'fun_marker_click\("(\d+)"', html)
+        spot_ids = list(dict.fromkeys(spot_ids))  # 중복제거
+
+        # 2단계: 각 스팟의 spot_info.asp 조회해서 차량번호 매칭
+        for spot_id in spot_ids[:30]:  # 너무 많으면 느리니 30개 제한
+            spot_resp = _requests.post(
+                f"{base_url}/reservation/spot_info.asp",
+                params={"SessionKey": session_key, "UserId": user_id, "CorpId": corp_id},
+                data={
+                    "SpotId": spot_id,
+                    "st_date": now_str,
+                    "end_date": end_str,
+                    "fdLicStatus": "True",
+                    "fdIsConfirm": "True",
+                },
+                verify=False,
+                timeout=10
+            )
+            spot_html = spot_resp.text
+
+            # 차량번호가 이 스팟에 있는지 확인
+            # 차량번호에서 숫자+한글 변환: "146하7820" 형태
+            car_no_clean = car_no.replace(" ", "")
+            if car_no_clean not in spot_html:
+                continue
+
+            # my-time div에서 예약 블록 추출
+            timeline_blocks = _re.findall(
+                r'<div class="my-time"[^>]*style="([^"]*)"[^>]*title="([^"]*)"',
+                spot_html
+            )
+
+            reservations = []
+            for style, title in timeline_blocks:
+                left_m  = _re.search(r'left:([\d.]+)%', style)
+                width_m = _re.search(r'width:([\d.]+)%', style)
+                reservations.append({
+                    "left":  float(left_m.group(1))  if left_m  else 0,
+                    "width": float(width_m.group(1)) if width_m else 0,
+                    "title": title,
+                })
+
+            return jsonify({"car_no": car_no, "reservations": reservations, "spot_id": spot_id})
+
+        return jsonify({"car_no": car_no, "reservations": [], "message": "예약 없음"})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
 
