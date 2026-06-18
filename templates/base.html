@@ -78,6 +78,11 @@
             <a href="{{ url_for('upload_wash_list') }}" class="side-link {% if request.endpoint == 'upload_wash_list' %}active{% endif %}">
                 <i class="ti ti-upload" aria-hidden="true"></i><b>오더 업로드</b>
             </a>
+            {% if current_user.is_master %}
+            <a href="{{ url_for('upload_terminal') }}" class="side-link {% if request.endpoint == 'upload_terminal' %}active{% endif %}">
+                <i class="ti ti-cpu" aria-hidden="true"></i><b>단말기 등록</b>
+            </a>
+            {% endif %}
             <!-- 계정 관리 -->
             <p class="side-nav-group" style="margin-top:4px;">계정 관리</p>
             <a href="{{ url_for('account_manage') }}" class="side-link {% if request.endpoint == 'account_manage' %}active{% endif %}">
