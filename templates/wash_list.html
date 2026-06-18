@@ -11,7 +11,7 @@
         </div>
     </div>
 
-    <div class="mob-date-card">
+    <div class="mob-date-card" style="display:flex;align-items:center;gap:4px;background:#fff;border-radius:18px;padding:6px;margin-bottom:8px;box-shadow:0 1px 8px rgba(0,0,0,0.07);">
         <button onclick="moveDate(-1)" style="width:38px;height:38px;border:none;border-radius:12px;background:#FFF2E9;color:#FF5F00;font-size:20px;font-weight:900;cursor:pointer;flex-shrink:0;">‹</button>
         <div onclick="toggleCalendar()" style="flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 0;cursor:pointer;">
             <span style="font-size:10px;font-weight:700;color:var(--color-text-tertiary);letter-spacing:.04em;margin-bottom:3px;">세차일</span>
@@ -19,7 +19,7 @@
         </div>
         <button onclick="moveDate(1)" style="width:38px;height:38px;border:none;border-radius:12px;background:#FFF2E9;color:#FF5F00;font-size:20px;font-weight:900;cursor:pointer;flex-shrink:0;">›</button>
     </div>
-    <div class="mob-stat-row" style="grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+    <div class="mob-stat-row" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
         <div style="background:#fff;border:none;border-radius:14px;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;box-shadow:0 1px 8px rgba(0,0,0,0.07);">
             <span style="font-size:11px;font-weight:700;color:var(--color-text-tertiary);">세차 대상</span>
             <strong style="font-size:24px;font-weight:900;color:var(--color-text-primary);letter-spacing:-.02em;">{{ total_target_count }}</strong>
@@ -107,6 +107,14 @@
                     </div>
                     <p><span>📍</span>{{ r['스팟'] or '-' }}</p>
                     <p><span>👤</span>{{ r['업체'] or current_user.vendor or '담당자 미지정' }}</p>
+                    <div class="res-timeline-bar" data-car="{{ r['차량번호'] }}" onclick="event.preventDefault()">
+                        <div class="res-bar-inner">
+                            <div class="res-bar-bg"></div>
+                            <div class="res-bar-blocks"></div>
+                            <div class="res-bar-now"></div>
+                        </div>
+                        <div class="res-bar-labels"><span>0</span><span>6</span><span>12</span><span>18</span><span>24</span></div>
+                    </div>
                 </div>
                 <span class="turu-row-arrow-v24">›</span>
             </a>
@@ -137,6 +145,14 @@
                     <p><span>📍</span>{{ r['스팟'] or '-' }}</p>
                     <p><span>🗓</span>{{ r['세차일'] or selected_date }}</p>
                     <p><span>👤</span>{{ r['업체'] or current_user.vendor or '담당자 미지정' }}</p>
+                    <div class="res-timeline-bar" data-car="{{ r['차량번호'] }}" onclick="event.preventDefault()">
+                        <div class="res-bar-inner">
+                            <div class="res-bar-bg"></div>
+                            <div class="res-bar-blocks"></div>
+                            <div class="res-bar-now"></div>
+                        </div>
+                        <div class="res-bar-labels"><span>0</span><span>6</span><span>12</span><span>18</span><span>24</span></div>
+                    </div>
                 </div>
                 <span class="turu-row-arrow-v24">›</span>
             </a>
@@ -663,4 +679,86 @@ function closeHistoryModal(){
         <div id="cal-days" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;"></div>
     </div>
 </div>
+
+<style>
+.res-timeline-bar { margin-top:10px; }
+.res-bar-inner {
+    position:relative; height:20px;
+    border-radius:4px; overflow:hidden;
+    background:#f0f0f0;
+}
+.res-bar-bg { position:absolute;inset:0; }
+.res-bar-blocks { position:absolute;inset:0; }
+.res-bar-now {
+    position:absolute; top:0; bottom:0;
+    width:2px; background:#ef4444; z-index:2;
+}
+.res-bar-labels {
+    display:flex; justify-content:space-between;
+    font-size:10px; color:#aaa; margin-top:2px;
+    padding:0 1px;
+}
+.res-block {
+    position:absolute; top:3px; bottom:3px;
+    background:#3b82f6; border-radius:2px;
+    opacity:0.75;
+}
+.res-bar-loading {
+    position:absolute;inset:0;
+    display:flex;align-items:center;justify-content:center;
+    font-size:10px;color:#bbb;
+}
+</style>
+
+<script>
+// 현재시간 선 위치 (0~100%)
+const nowPct = (() => {
+    const n = new Date();
+    return (n.getHours() * 60 + n.getMinutes()) / (24 * 60) * 100;
+})();
+
+// 차량별 타임라인 로드 (병렬)
+async function loadAllTimelines() {
+    const bars = document.querySelectorAll('.res-timeline-bar');
+    const promises = Array.from(bars).map(bar => loadOneTimeline(bar));
+    await Promise.allSettled(promises);
+}
+
+async function loadOneTimeline(bar) {
+    const carNo = bar.dataset.car;
+    const inner = bar.querySelector('.res-bar-inner');
+    const blocks = bar.querySelector('.res-bar-blocks');
+    const nowLine = bar.querySelector('.res-bar-now');
+
+    // 현재시간 선
+    nowLine.style.left = nowPct + '%';
+
+    // 로딩 표시
+    const loading = document.createElement('div');
+    loading.className = 'res-bar-loading';
+    loading.textContent = '조회 중…';
+    inner.appendChild(loading);
+
+    try {
+        const res = await fetch(`/peoplecar_reservation/${encodeURIComponent(carNo)}`);
+        const data = await res.json();
+        loading.remove();
+
+        if (data.error || !data.reservations) return;
+
+        data.reservations.forEach(r => {
+            const div = document.createElement('div');
+            div.className = 'res-block';
+            div.style.left = r.left + '%';
+            div.style.width = r.width + '%';
+            div.title = r.title;
+            blocks.appendChild(div);
+        });
+    } catch(e) {
+        loading.textContent = '';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadAllTimelines);
+</script>
 {% endblock %}
