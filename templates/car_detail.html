@@ -64,6 +64,39 @@
             <div id="control-status" style="margin-top:8px;font-size:13px;font-weight:700;text-align:center;min-height:18px;color:#666;"></div>
         </div>
         {% endif %}
+
+        <!-- 예약 현황 타임라인 -->
+        <div style="border-top:1px solid #f0f0f0;margin-top:16px;padding-top:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <div style="font-size:11px;font-weight:800;color:#999;letter-spacing:0.06em;text-transform:uppercase;">오늘 예약 현황</div>
+                <button type="button" onclick="loadReservation()" style="font-size:11px;color:#888;background:none;border:1px solid #e5e7eb;border-radius:6px;padding:3px 8px;cursor:pointer;">새로고침</button>
+            </div>
+            <div id="res-timeline-wrap">
+                <div id="res-loading" style="font-size:12px;color:#aaa;text-align:center;padding:10px 0;">불러오는 중...</div>
+                <!-- 타임라인 바 -->
+                <div id="res-timeline" style="display:none;">
+                    <div style="position:relative;height:28px;background:#f5f5f5;border-radius:6px;overflow:hidden;margin-bottom:6px;">
+                        <!-- 시간 눈금 0~24 -->
+                        <div style="position:absolute;inset:0;display:flex;">
+                            {% for h in range(25) %}
+                            <div style="flex:1;border-left:1px solid #e0e0e0;{% if h==0 %}border-left:none;{% endif %}"></div>
+                            {% endfor %}
+                        </div>
+                        <!-- 예약 블록들 (JS로 채움) -->
+                        <div id="res-blocks"></div>
+                        <!-- 현재시간 선 (JS로 위치) -->
+                        <div id="res-now-line" style="position:absolute;top:0;bottom:0;width:2px;background:#ef4444;z-index:2;"></div>
+                    </div>
+                    <!-- 시간 레이블 -->
+                    <div style="display:flex;justify-content:space-between;font-size:10px;color:#aaa;padding:0 2px;">
+                        <span>0시</span><span>6</span><span>12</span><span>18</span><span>24</span>
+                    </div>
+                    <div id="res-detail" style="margin-top:8px;font-size:12px;color:#555;line-height:1.8;"></div>
+                </div>
+                <div id="res-empty" style="display:none;font-size:12px;color:#aaa;text-align:center;padding:10px 0;">오늘 예약 없음</div>
+                <div id="res-error" style="display:none;font-size:12px;color:#f87171;text-align:center;padding:10px 0;"></div>
+            </div>
+        </div>
     </article>
 
     <form id="wash-form" class="work-form app-card work-form-clean" action="{{ url_for('wash_complete', id=car['id']) }}" method="POST">
@@ -91,6 +124,65 @@ const carInfo={number:{{ car['차량번호'] | tojson }},model:{{ car['차종명
 async function copyToClipboard(text){if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(text);return;}const textarea=document.createElement("textarea");textarea.value=text;textarea.style.position="fixed";textarea.style.left="-9999px";document.body.appendChild(textarea);textarea.focus();textarea.select();document.execCommand("copy");document.body.removeChild(textarea);}
 async function copyInfo(){const distance=document.getElementById("distance").value||"없음";const damage=document.getElementById("damage").value||"없음";const warning=document.getElementById("warning").value||"없음";const etc=document.getElementById("etc").value||"없음";const text=[`[세차 완료 공유]`,`세차일자: ${carInfo.washDate||"-"}`,`차량번호: ${carInfo.number||"-"}`,`차종명: ${carInfo.model||"-"}`,`차량소속: ${carInfo.org||"-"}`,`스팟: ${carInfo.spot||"-"}`,`주소: ${carInfo.address||"-"}`,`지역: ${(carInfo.region1||"-")} ${(carInfo.region2||"")}`,`주행거리: ${distance}`,`훼손: ${damage}`,`경고등: ${warning}`,`특이사항: ${etc}`].join("\n");await copyToClipboard(text).catch(()=>null);alert("복사되었습니다.");}
 async function openBand(){try{const response=await fetch("{{ url_for('band_link', id=car['id']) }}");const data=await response.json();if(!response.ok||!data.ok||!data.band_link){alert(data.message||"등록된 밴드 링크가 없습니다.");return;}window.open(data.band_link,"_blank","noopener");}catch(error){alert("밴드 링크를 불러오는 중 오류가 발생했습니다.");}}
+
+// 예약 현황 타임라인
+async function loadReservation() {
+    const carNo = carInfo.number;
+    document.getElementById('res-loading').style.display = 'block';
+    document.getElementById('res-timeline').style.display = 'none';
+    document.getElementById('res-empty').style.display = 'none';
+    document.getElementById('res-error').style.display = 'none';
+
+    try {
+        const res = await fetch(`/peoplecar_reservation/${encodeURIComponent(carNo)}`);
+        const data = await res.json();
+
+        document.getElementById('res-loading').style.display = 'none';
+
+        if (data.error) {
+            document.getElementById('res-error').textContent = '⚠️ ' + data.error;
+            document.getElementById('res-error').style.display = 'block';
+            return;
+        }
+
+        if (!data.reservations || data.reservations.length === 0) {
+            document.getElementById('res-empty').style.display = 'block';
+            return;
+        }
+
+        // 예약 블록 렌더링
+        const blocksEl = document.getElementById('res-blocks');
+        blocksEl.innerHTML = '';
+        let detailText = '';
+        data.reservations.forEach((r, i) => {
+            const div = document.createElement('div');
+            div.style.cssText = `position:absolute;top:4px;bottom:4px;left:${r.left}%;width:${r.width}%;background:#3b82f6;border-radius:3px;opacity:0.85;`;
+            div.title = r.title;
+            blocksEl.appendChild(div);
+            // 시간 파싱해서 텍스트로
+            const parts = r.title.split('~');
+            if (parts.length === 2) {
+                detailText += `• ${parts[0].trim().replace('2026-06-','').replace(/-/g,'/')} → ${parts[1].trim().replace('2026-06-','').replace(/-/g,'/')}\n`;
+            }
+        });
+
+        // 현재시간 선
+        const now = new Date();
+        const pct = (now.getHours() * 60 + now.getMinutes()) / (24 * 60) * 100;
+        document.getElementById('res-now-line').style.left = pct + '%';
+
+        document.getElementById('res-detail').textContent = detailText.trim();
+        document.getElementById('res-timeline').style.display = 'block';
+
+    } catch(e) {
+        document.getElementById('res-loading').style.display = 'none';
+        document.getElementById('res-error').textContent = '⚠️ 조회 실패: ' + e.message;
+        document.getElementById('res-error').style.display = 'block';
+    }
+}
+
+// 페이지 로드 시 자동 조회
+window.addEventListener('DOMContentLoaded', loadReservation);
 </script>
 {# ── 데스크탑 전용 ── #}
 <div id="d-car-detail" style="display:none">
